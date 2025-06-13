@@ -9,10 +9,13 @@ const router = express.Router();
 const { uploadImages } = require("../utils/uploadImage");
 
 
-const validMassarTypes = {
-  smallPattern: ['مصار باشمينا صغيرة', 'مصار سوبر تورمة صغيرة', 'مصار نص تورمة صغيرة'],
-  largePattern: ['مصار باشمينا كبيرة', 'مصار سوبر تورمة كبيرة', 'مصار نص تورمة كبيرة']
-};
+const validMassarTypes = [
+  'سوبر ترمه يد',
+  'سوبر ترمه قلمكاري',
+  'نص ترمه',
+  'بشمينا'
+];
+
 const validKumaTypes = ['كمه خياطة اليد', 'كمه ديواني'];
 const validKumaSizes = ['9.5', '9.75', '10', '10.25', '10.5', '10.75', '11', '11.25', '11.5', '11.75'];
 
@@ -31,57 +34,44 @@ router.post("/uploadImages", async (req, res) => {
   }
 });
 
-
-// نقطة النهاية لإنشاء منتج
 router.post("/create-product", async (req, res) => {
   try {
     const { name, category, subCategory, description, price, image, author } = req.body;
 
-    // تحقق من الحقول المطلوبة
     if (!name || !category || !description || !price || !image || !author) {
       return res.status(400).send({ message: "جميع الحقول المطلوبة يجب إرسالها" });
     }
 
-    // تحقق من صحة السعر
     const priceNum = parseFloat(price);
     if (isNaN(priceNum)) {
       return res.status(400).send({ message: "السعر يجب أن يكون رقماً" });
     }
 
-    // تحقق من النوع الفرعي إذا كانت الفئة "كمه"
     if (category === "كمه") {
       if (!subCategory) {
           return res.status(400).send({ message: "نوع الكمه مطلوب" });
       }
       
-      // تحقق مما إذا كان subCategory يحتوي على مقاس
       const hasSize = validKumaSizes.some(size => subCategory.includes(size));
       
       if (hasSize) {
-          // إذا كان يحتوي على مقاس، نتحقق من النوع الأساسي
           const baseType = subCategory.split('-')[0];
           if (!validKumaTypes.includes(baseType)) {
               return res.status(400).send({ message: "نوع الكمه غير صالح" });
           }
       } else {
-          // إذا لم يكن يحتوي على مقاس، نتحقق من النوع الأساسي فقط
           if (!validKumaTypes.includes(subCategory)) {
               return res.status(400).send({ message: "نوع الكمه غير صالح" });
           }
       }
     }
     
-    // تحقق من النوع الفرعي إذا كانت الفئة "مصار"
     if (category === "مصار") {
       if (!subCategory) {
         return res.status(400).send({ message: "النوع الفرعي مطلوب لمنتجات المصار" });
       }
       
-      const isValidSubCategory = Object.values(validMassarTypes)
-        .flat()
-        .includes(subCategory);
-      
-      if (!isValidSubCategory) {
+      if (!validMassarTypes.includes(subCategory)) {
         return res.status(400).send({ message: "النوع الفرعي غير صالح" });
       }
     }
@@ -191,8 +181,15 @@ router.get("/:id", async (req, res) => {
 router.patch("/update-product/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const productId = req.params.id;
-    const { category, subCategory, ...rest } = req.body;
+    const { data } = req.body; // تغيير هنا لاستقبال البيانات ضمن كائن data
 
+    if (!data) {
+      return res.status(400).send({ message: "بيانات الطلب غير صالحة" });
+    }
+
+    const { category, subCategory, ...rest } = data; // استخراج الخصائص من data
+
+    // التحقق من صحة أنواع الكمه إذا كانت الفئة "كمه"
     if (category === "كمه" && subCategory) {
       if (subCategory.includes('-')) {
         const [baseType, size] = subCategory.split('-');
@@ -204,6 +201,7 @@ router.patch("/update-product/:id", verifyToken, verifyAdmin, async (req, res) =
       }
     }
 
+    // التحقق من صحة أنواع المصار إذا كانت الفئة "مصار"
     if (category === "مصار" && subCategory) {
       const isValidSubCategory = Object.values(validMassarTypes)
         .flat()
@@ -213,16 +211,18 @@ router.patch("/update-product/:id", verifyToken, verifyAdmin, async (req, res) =
       }
     }
 
+    // بناء كائن التحديث
     const updateData = { 
       ...rest,
-      ...(category && { category }),
-      ...(subCategory && { subCategory })
+      category,
+      subCategory
     };
 
+    // تنفيذ التحديث
     const updatedProduct = await Products.findByIdAndUpdate(
       productId,
-      updateData,
-      { new: true }
+      { $set: updateData }, // استخدام عامل $set لتحديث الحقول المحددة فقط
+      { new: true, runValidators: true } // إضافة runValidators للتحقق من صحة البيانات
     );
 
     if (!updatedProduct) {
@@ -235,7 +235,7 @@ router.patch("/update-product/:id", verifyToken, verifyAdmin, async (req, res) =
     });
   } catch (error) {
     console.error("خطأ في تحديث المنتج", error);
-    res.status(500).send({ message: "فشل في تحديث المنتج" });
+    res.status(500).send({ message: "فشل في تحديث المنتج", error: error.message });
   }
 });
 
