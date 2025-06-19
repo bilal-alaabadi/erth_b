@@ -6,7 +6,7 @@ const path = require("path");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
-const port = process.env.PORT || 5002;
+const port = 5002;
 
 // Middleware setup
 app.use(express.json({ limit: "25mb" }));
@@ -15,17 +15,15 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
     cors({
-        // origin:"https://genuine-f-delta.vercel.app",
-        // origin:"https://www.genuineman.store",
-        origin: "https://erth-f.vercel.app",//مال الفرونت اند
+        // origin:"https://pinkheart-f.vercel.app",
+        origin: ["https://www.erthe.online","https://erthe.online"],//مال الفرونت اند
         credentials: true,
     })
 );
 
-
 // دعم طلبات OPTIONS (Preflight Requests)
 app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', 'https://erth-f.vercel.app');
+    res.header('Access-Control-Allow-Origin', 'https://www.erthe.online');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.send();
@@ -60,6 +58,10 @@ async function main() {
         res.send("يعمل الان");
     });
 }
+
+app.get("/api/test", (req, res) => {
+    res.json({ message: "API is working ✅" });
+});
 
 // رفع صورة واحدة
 app.post("/uploadImage", (req, res) => {
