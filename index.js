@@ -1,3 +1,4 @@
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -8,26 +9,41 @@ const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const port = 5002;
 
-// Middleware setup
-app.use(express.json({ limit: "25mb" }));
+// Remove bodyParser (redundant with express.json())
+app.use(express.json({ limit: "25mb" }));  // Handles JSON payloads
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));  // For URL-encoded data
 app.use(cookieParser());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(
-    cors({
-        // origin:"https://pinkheart-f.vercel.app",
-        origin: ["https://www.erthe.online","https://erthe.online"],//مال الفرونت اند
-        credentials: true,
-    })
-);
 
-// دعم طلبات OPTIONS (Preflight Requests)
-app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', 'https://www.erthe.online');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.send();
-})
+// Enhanced CORS configuration
+const allowedOrigins = [
+  "https://www.erthe.online",
+  "https://erthe.online",
+  "http://localhost:5173",
+];
+
+// 👇 نفس الإعدادات مع إضافة PATCH
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // ← PATCH مضافة هنا
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// OPTIONS handler (for preflight) — استخدم نفس الخيارات
+app.options('*', cors(corsOptions));  // Let the cors middleware handle it
 
 // رفع الصور
 const uploadImage = require("./src/utils/uploadImage");
@@ -45,7 +61,6 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/stats", statsRoutes);
 
-
 // الاتصال بقاعدة البيانات
 main()
     .then(() => console.log("MongoDB is successfully connected."))
@@ -58,10 +73,6 @@ async function main() {
         res.send("يعمل الان");
     });
 }
-
-app.get("/api/test", (req, res) => {
-    res.json({ message: "API is working ✅" });
-});
 
 // رفع صورة واحدة
 app.post("/uploadImage", (req, res) => {
